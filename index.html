@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Matrix Blue ASCII City</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000814;
+    color: #4fd5ff;
+    font-family: "Courier New", monospace;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 20%, #001a33 0%, #000814 70%);
+  }
+
+  pre {
+    margin: 0;
+    padding: 16px;
+    line-height: 1.05;
+    font-size: 12px;
+    color: #4fd5ff;
+    text-shadow: 0 0 6px #4fd5ff;
+    user-select: none;
+  }
+
+  /* Blue scanlines */
+  #overlay {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 40, 80, 0.0) 0px,
+      rgba(0, 40, 80, 0.0) 2px,
+      rgba(0, 40, 80, 0.25) 3px
+    );
+    mix-blend-mode: soft-light;
+  }
+</style>
+</head>
+<body>
+<div id="container">
+  <pre id="scene"></pre>
+</div>
+<div id="overlay"></div>
+
+<script>
+(function () {
+  const pre = document.getElementById("scene");
+
+  let cols = 120;
+  let rows = 40;
+
+  function resizeGrid() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    cols = Math.floor(w / 10);
+    rows = Math.floor(h / 18);
+  }
+  resizeGrid();
+  window.addEventListener("resize", resizeGrid);
+
+  let t = 0;
+  const timeSpeed = 0.04;
+
+  let mouseX = null;
+  let mouseY = null;
+  let lastMoveTime = 0;
+
+  window.addEventListener("mousemove", (e) => {
+    const rect = pre.getBoundingClientRect();
+    mouseX = ((e.clientX - rect.left) / rect.width) * cols;
+    mouseY = ((e.clientY - rect.top) / rect.height) * rows;
+    lastMoveTime = performance.now();
+  });
+
+  const skyChars = [" ", ".", "`", "'", "-", "~"];
+  const buildingChars = ["█", "▓", "▒", "#", "%", "@"];
+
+  function skylineHeight(x) {
+    const base = rows * 0.55;
+    const noise =
+      Math.sin(x * 0.15) * 3 +
+      Math.sin(x * 0.05) * 6 +
+      Math.sin(x * 0.01) * 12;
+    return base + noise;
+  }
+
+  function moonMask(x, y) {
+    const mx = cols * 0.5;
+    const my = rows * 0.25;
+    const dx = x - mx;
+    const dy = y - my;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    return dist < 8 ? 1 - dist / 8 : 0;
+  }
+
+  function rippleEffect(x, y, time) {
+    if (mouseX === null) return 0;
+    const dx = x - mouseX;
+    const dy = y - mouseY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const radius = 10;
+    if (dist > radius) return 0;
+    const falloff = 1 - dist / radius;
+    return Math.sin(dist * 0.8 - time * 4) * 2 * falloff;
+  }
+
+  function render() {
+    t += timeSpeed;
+    const now = performance.now();
+
+    if (mouseX !== null && now - lastMoveTime > 2000) {
+      mouseX = null;
+      mouseY = null;
+    }
+
+    let output = "";
+
+    for (let y = 0; y < rows; y++) {
+      let line = "";
+
+      for (let x = 0; x < cols; x++) {
+        const skyWave =
+          Math.sin((x * 0.12) - t * 1.2) * 2 +
+          Math.sin((x * 0.03) - t * 0.5) * 3;
+
+        const ripple = rippleEffect(x, y, t);
+
+        const h = skylineHeight(x) + ripple;
+
+        if (y < h) {
+          const m = moonMask(x, y);
+          if (m > 0) {
+            line += m > 0.7 ? "@" : m > 0.4 ? "O" : "o";
+          } else {
+            const idx = Math.floor(Math.random() * buildingChars.length);
+            line += buildingChars[idx];
+          }
+        } else {
+          const idx = Math.floor(
+            Math.abs(Math.sin((x + y + t * 4) * 0.1)) * skyChars.length
+          );
+          line += skyChars[idx];
+        }
+      }
+
+      output += line + (y < rows - 1 ? "\n" : "");
+    }
+
+    pre.textContent = output;
+    requestAnimationFrame(render);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
